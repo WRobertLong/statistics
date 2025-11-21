@@ -1,9 +1,3 @@
-Here is a standard, professional README.md template tailored to your project.
-
-You can create a file named README.md in your root folder and paste the following content into it.
-
-Markdown
-
 # Rust Statistics Library
 
 A personal project building a statistics and linear algebra library from scratch in Rust.
