@@ -63,7 +63,18 @@ impl Matrix {
         }
     }
 
-    // <-- TRANSPOSE MUST BE HERE!
+    /// Creates an Identity Matrix of size n x n.
+    /// Diagonal elements are 1.0, others are 0.0.
+    pub fn identity(n: usize) -> Self {
+        let mut mat = Matrix::zeros(n, n);
+        for i in 0..n {
+            // Set diagonal element at (i, i) to 1.0
+            // Index formula: row * cols + col => i * n + i
+            mat.data[i * n + i] = 1.0;
+        }
+        mat
+    }
+
     /// Calculates the transpose of the matrix (M^T).
     pub fn transpose(&self) -> Self {
         // 1. Create the new matrix with dimensions swapped (cols x rows)
@@ -154,6 +165,19 @@ impl Matrix {
             self.data.swap(idx1, idx2);
         }
     }
+
+    /// Returns the diagonal elements as a new Vector
+    pub fn diagonal(&self) -> Vec<f64> {
+        let n = std::cmp::min(self.rows, self.cols);
+        let mut diag = Vec::with_capacity(n);
+        for i in 0..n {
+            diag.push(self[(i, i)]);
+        }
+        diag
+    }
+
+
+
 }
 
 
