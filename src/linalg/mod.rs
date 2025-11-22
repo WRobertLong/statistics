@@ -63,18 +63,6 @@ impl Matrix {
         }
     }
 
-    /// Creates an Identity Matrix of size n x n.
-    /// Diagonal elements are 1.0, others are 0.0.
-    pub fn identity(n: usize) -> Self {
-        let mut mat = Matrix::zeros(n, n);
-        for i in 0..n {
-            // Set diagonal element at (i, i) to 1.0
-            // Index formula: row * cols + col => i * n + i
-            mat.data[i * n + i] = 1.0;
-        }
-        mat
-    }
-
     /// Calculates the transpose of the matrix (M^T).
     pub fn transpose(&self) -> Self {
         // 1. Create the new matrix with dimensions swapped (cols x rows)
@@ -148,7 +136,8 @@ impl Matrix {
         Ok(result)
     }
 
-    /// Helper: Creates an Identity Matrix (1s on diagonal, 0s elsewhere)
+    /// Creates an Identity Matrix of size n x n.
+    /// Diagonal elements are 1.0, others are 0.0
     pub fn identity(n: usize) -> Self {
         let mut mat = Matrix::zeros(n, n);
         for i in 0..n {
@@ -176,6 +165,21 @@ impl Matrix {
         diag
     }
 
+    /// Element-wise subtraction (self - other)
+    pub fn subtract(&self, other: &Matrix) -> Result<Matrix, StatsError> {
+        if self.rows != other.rows || self.cols != other.cols {
+            return Err(StatsError::DimensionMismatch {
+                expected: format!("{}x{}", self.rows, self.cols),
+                actual: format!("{}x{}", other.rows, other.cols),
+            });
+        }
+        let new_data = self.data.iter()
+            .zip(other.data.iter())
+            .map(|(a, b)| a - b)
+            .collect();
+        
+        Ok(Matrix::new(new_data, self.rows, self.cols).unwrap())
+    }
 
 
 }
