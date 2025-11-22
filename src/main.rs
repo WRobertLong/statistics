@@ -104,9 +104,43 @@ fn main() {
         Err(e) => println!("Success! Caught expected error: {}", e),
     }
 
+    println!("--- OLS LINEAR REGRESSION TEST ---");
+    println!("Target Model: y = 2x + 1");
 
+    // 1. Create Design Matrix X (4 rows, 2 columns)
+    // Col 0: Intercept (1.0)
+    // Col 1: Variable x (1, 2, 3, 4)
+    let x_data = vec![
+        1.0, 1.0,  // Row 1
+        1.0, 2.0,  // Row 2
+        1.0, 3.0,  // Row 3
+        1.0, 4.0   // Row 4
+    ];
+    let x = linalg::Matrix::new(x_data, 4, 2).unwrap();
 
+    // 2. Create Target Vector y (4 rows, 1 column)
+    // y = 2(1)+1 = 3
+    // y = 2(2)+1 = 5
+    // ...
+    let y_data = vec![3.0, 5.0, 7.0, 9.0];
+    let y = linalg::Matrix::new(y_data, 4, 1).unwrap();
 
+    println!("Design Matrix X:\n{}", x);
+    println!("Target Vector y:\n{}", y);
+
+    // 3. Run Regression
+    match linalg::ols(&x, &y) {
+        Ok(beta) => {
+            println!("--------------------------------");
+            println!("Estimated Coefficients (Beta):");
+            println!("{}", beta);
+            
+            println!("Interpretation:");
+            println!("Intercept (Beta_0): {:.4}", beta[(0, 0)]);
+            println!("Slope (Beta_1):     {:.4}", beta[(1, 0)]);
+        },
+        Err(e) => println!("Regression Failed: {}", e),
+    }
 
     println!("\nAll tests completed successfully! 🎉");
 
