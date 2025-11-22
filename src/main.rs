@@ -62,12 +62,55 @@ fn main() {
     let val_t_1_2 = a_t[(1, 2)];
     println!("Element at A^T[1, 2] is: {:.1}", val_t_1_2); 
 
+    println!("--- MATRIX INVERSION TEST ---");
+
+    // 1. Define a 2x2 Matrix (that we know is invertible)
+    // Matrix A = [[4, 7], [2, 6]]
+    // Determinant = (4*6) - (7*2) = 24 - 14 = 10.
+    // Since Det != 0, it is invertible.
+    let data = vec![4.0, 7.0, 2.0, 6.0];
+    let a = linalg::Matrix::new(data, 2, 2).unwrap();
+
+    println!("Original Matrix A:\n{}", a);
+
+    // 2. Calculate Inverse
+    match a.inverse() {
+        Ok(a_inv) => {
+            println!("Inverse Matrix A^-1:\n{}", a_inv);
+            
+            // MANUAL CHECK:
+            // Inverse should be: [[0.6, -0.7], [-0.2, 0.4]]
+            
+            // 3. Verify: A * A^-1 should equal Identity
+            println!("Verification (A * A^-1):");
+            let identity_check = a.multiply(&a_inv).unwrap();
+            println!("{}", identity_check);
+            
+            // The result should look like:
+            // 1.0000  0.0000
+            // 0.0000  1.0000
+        },
+        Err(e) => println!("Inversion failed: {}", e),
+    }
+
+    println!("\n--- SINGULAR MATRIX TEST (Should Fail) ---");
+    // Matrix B = [[1, 2], [2, 4]]
+    // Det = 4 - 4 = 0. This is singular.
+    let singular_data = vec![1.0, 2.0, 2.0, 4.0];
+    let b = linalg::Matrix::new(singular_data, 2, 2).unwrap();
+    
+    match b.inverse() {
+        Ok(_) => println!("Error: Singular matrix should not have inverted!"),
+        Err(e) => println!("Success! Caught expected error: {}", e),
+    }
+
+
+
+
+
     println!("\nAll tests completed successfully! 🎉");
 
 
 
-    // 2. The Integer Problem
-    // let integers = vec![1, 2, 3, 4, 5];
-    // linalg::mean(&integers); // <--- THIS WILL ERROR if you uncomment it!
-    // Error: expected `&[f64]`, found `&[i32]`
+
 }

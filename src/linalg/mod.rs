@@ -78,7 +78,84 @@ impl Matrix {
         }
         transposed
     }
+
+    pub fn inverse(&self) -> Result<Self, StatsError> {
+        if self.rows != self.cols {
+            return Err(StatsError::NotSquare(self.rows, self.cols));
+        }
+
+        let n = self.rows;
+        let mut result = Matrix::identity(n); // We need to implement this helper!
+        let mut m = self.clone(); // Working copy of the matrix
+
+        // Gauss-Jordan Elimination
+        for i in 0..n {
+            // 1. Find pivot (row with largest value in current column)
+            let mut pivot_row = i;
+            let mut max_val = m[(i, i)].abs();
+
+            for r in (i + 1)..n {
+                if m[(r, i)].abs() > max_val {
+                    max_val = m[(r, i)].abs();
+                    pivot_row = r;
+                }
+            }
+
+            // Check for singularity (pivot is too close to zero)
+            if max_val < 1e-10 {
+                return Err(StatsError::SingularMatrix);
+            }
+
+            // 2. Swap rows if needed (in both 'm' and 'result')
+            if pivot_row != i {
+                m.swap_rows(i, pivot_row);
+                result.swap_rows(i, pivot_row);
+            }
+
+            // 3. Normalize the pivot row (make diagonal element 1)
+            let pivot = m[(i, i)];
+            for c in 0..n {
+                m.data[i * n + c] /= pivot;
+                result.data[i * n + c] /= pivot;
+            }
+
+            // 4. Eliminate other rows (make column 0 everywhere else)
+            for r in 0..n {
+                if r != i {
+                    let factor = m[(r, i)];
+                    for c in 0..n {
+                        let val_m = m[(i, c)]; 
+                        m.data[r * n + c] -= factor * val_m;
+                        
+                        let val_res = result[(i, c)];
+                        result.data[r * n + c] -= factor * val_res;
+                    }
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Helper: Creates an Identity Matrix (1s on diagonal, 0s elsewhere)
+    pub fn identity(n: usize) -> Self {
+        let mut mat = Matrix::zeros(n, n);
+        for i in 0..n {
+            mat.data[i * n + i] = 1.0;
+        }
+        mat
+    }
+
+    /// Helper: Swaps two rows in place
+    fn swap_rows(&mut self, r1: usize, r2: usize) {
+        for c in 0..self.cols {
+            let idx1 = r1 * self.cols + c;
+            let idx2 = r2 * self.cols + c;
+            self.data.swap(idx1, idx2);
+        }
+    }
 }
+
 
 // -----------------------------------------------------------
 // 3. THE DISPLAY TRAIT (Impl for external traits go outside the main impl)
