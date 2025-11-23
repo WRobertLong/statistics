@@ -1,6 +1,8 @@
 // src/main.rs
 
-use statistics::linalg;
+use statistics::linalg;            // For Matrix
+use statistics::stats::univariate; // For mean, median, variance
+use statistics::stats::linear;     // For ols
 
 fn main() {
     println!("--- RUST STATS LIBRARY TESTS ---");
@@ -13,17 +15,17 @@ fn main() {
     let my_data = vec![1.0, 2.0, 3.0, 4.0, 100.0];
     
     // match handles the Option result (Some or None)
-    match linalg::mean(&my_data) {
+    match univariate::mean(&my_data) {
         Some(m) => println!("Mean: {:.2}", m),
         None => println!("Vector was empty!"),
     }
 
-    match linalg::median(&my_data) {
+    match univariate::median(&my_data) {
         Some(m) => println!("Median: {:.2}", m),
         None => println!("Vector was empty!"),
     }
 
-    match linalg::sample_variance(&my_data) {
+    match univariate::sample_variance(&my_data) {
         Some(m) => println!("Sample Variance|: {:.2}", m),
         None => println!("Vector was empty!"),
     }
@@ -129,7 +131,7 @@ fn main() {
     println!("Target Vector y:\n{}", y);
 
     // 3. Run Regression
-    match linalg::ols(&x, &y) {
+    match linear::fit_ols(&x, &y) {
         Ok(beta) => {
             println!("--------------------------------");
             println!("Estimated Coefficients (Beta):");
