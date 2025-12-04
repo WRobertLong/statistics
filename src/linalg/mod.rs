@@ -263,6 +263,83 @@ impl Matrix {
         Ok(Matrix::new(new_data, self.rows, self.cols).unwrap())
     }
 
+    /// Solves the linear system Ax = b using Gauss-Jordan elimination.
+    /// Returns x.
+    /// 'self' is A, 'rhs' is b.
+    pub fn solve(&self, rhs: &Matrix) -> Result<Matrix, StatsError> {
+        if self.rows != self.cols {
+            return Err(StatsError::NotSquare(self.rows, self.cols));
+        }
+        if self.rows != rhs.rows {
+            return Err(StatsError::DimensionMismatch {
+                expected: format!("A.rows ({}) == b.rows ({})", self.rows, rhs.rows),
+                actual: format!("{} vs {}", self.rows, rhs.rows),
+            });
+        }
+
+        let n = self.rows;
+        // We clone both because we need to mutate them to reduce A to Identity
+        let mut aug_a = self.clone(); 
+        let mut aug_b = rhs.clone();
+
+        for i in 0..n {
+            // 1. Pivot: Find the best row
+            let mut pivot_row = i;
+            let mut max_val = aug_a[(i, i)].abs();
+            
+            for r in (i + 1)..n {
+                if aug_a[(r, i)].abs() > max_val {
+                    max_val = aug_a[(r, i)].abs();
+                    pivot_row = r;
+                }
+            }
+
+            if max_val < 1e-10 {
+                return Err(StatsError::SingularMatrix);
+            }
+
+            // 2. Swap Rows in BOTH A and b
+            if pivot_row != i {
+                aug_a.swap_rows(i, pivot_row);
+                aug_b.swap_rows(i, pivot_row);
+            }
+
+            // 3. Normalize the pivot row
+            let pivot = aug_a[(i, i)];
+            for c in 0..n {
+                aug_a.data[i * n + c] /= pivot;
+            }
+            // Apply to RHS (note: rhs can have multiple columns, so iterate cols)
+            for c in 0..aug_b.cols {
+                aug_b.data[i * aug_b.cols + c] /= pivot;
+            }
+
+            // 4. Eliminate other rows
+            for r in 0..n {
+                if r != i {
+                    let factor = aug_a[(r, i)];
+                    
+                    // Subtract from A
+                    for c in 0..n {
+                        let val = aug_a[(i, c)];
+                        aug_a.data[r * n + c] -= factor * val;
+                    }
+                    
+                    // Subtract from b
+                    for c in 0..aug_b.cols {
+                        let val = aug_b[(i, c)];
+                        aug_b.data[r * aug_b.cols + c] -= factor * val;
+                    }
+                }
+            }
+        }
+
+        // At this point, aug_a is Identity, and aug_b is the solution x
+        Ok(aug_b)
+    }
+
+
+
 }
 
 // ========================================================
