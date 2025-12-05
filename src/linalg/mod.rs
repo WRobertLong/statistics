@@ -338,6 +338,74 @@ impl Matrix {
         Ok(aug_b)
     }
 
+    // ... inside impl Matrix ...
+
+    /// Performs Cholesky decomposition: A = L * L^T.
+    /// Returns L (Lower Triangular Matrix).
+    /// Requires matrix to be Symmetric Positive Definite (SPD).
+    pub fn cholesky(&self) -> Result<Matrix, StatsError> {
+        if self.rows != self.cols {
+            return Err(StatsError::NotSquare(self.rows, self.cols));
+        }
+        
+        let n = self.rows;
+        let mut l = Matrix::zeros(n, n);
+
+        for i in 0..n {
+            for j in 0..=i {
+                let mut sum = self[(i, j)];
+                
+                for k in 0..j {
+                    sum -= l[(i, k)] * l[(j, k)];
+                }
+
+                if i == j {
+                    // Diagonal element
+                    if sum <= 0.0 {
+                        return Err(StatsError::Generic("Matrix is not Positive Definite".into()));
+                    }
+                    l.data[i * n + j] = sum.sqrt();
+                } else {
+                    // Off-diagonal
+                    l.data[i * n + j] = sum / l[(j, j)];
+                }
+            }
+        }
+        Ok(l)
+    }
+
+    /// Solves Ax = b using Cholesky decomposition.
+    pub fn cholesky_solve(&self, rhs: &Matrix) -> Result<Matrix, StatsError> {
+        let l = self.cholesky()?;
+        let n = self.rows;
+        
+        // 1. Forward Substitution: Solve L * y = b
+        let mut y = Matrix::zeros(n, rhs.cols);
+        for k in 0..rhs.cols {
+            for i in 0..n {
+                let mut sum = rhs[(i, k)];
+                for j in 0..i {
+                    sum -= l[(i, j)] * y[(j, k)];
+                }
+                y.data[i * rhs.cols + k] = sum / l[(i, i)];
+            }
+        }
+
+        // 2. Backward Substitution: Solve L^T * x = y
+        let mut x = Matrix::zeros(n, rhs.cols);
+        for k in 0..rhs.cols {
+            for i in (0..n).rev() {
+                let mut sum = y[(i, k)];
+                for j in (i + 1)..n {
+                    sum -= l[(j, i)] * x[(j, k)];
+                }
+                x.data[i * rhs.cols + k] = sum / l[(i, i)];
+            }
+        }
+
+        Ok(x)
+    }
+
 
 
 }

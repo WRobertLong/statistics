@@ -26,8 +26,8 @@ pub fn fit_ols(x: &Matrix, y: &Matrix) -> Result<Matrix, StatsError> {
 
 
 /// Performs Ordinary Least Squares (OLS) Linear Regression.
-/// Returns the vector of coefficients (beta).
-pub fn fit_ols_basic(x: &Matrix, y: &Matrix) -> Result<Matrix, StatsError> {
+/// Returns the vector of coefficients (beta). Works by direct inversion.
+pub fn fit_ols_naive(x: &Matrix, y: &Matrix) -> Result<Matrix, StatsError> {
     // 1. Calculate X^T
     let xt = x.transpose();
 
