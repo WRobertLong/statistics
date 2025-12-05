@@ -340,6 +340,164 @@ impl Matrix {
 
     // ... inside impl Matrix ...
 
+    // --- QR DECOMPOSITION (The Numerical Gold Standard) ---
+
+    /// Computes the Reduced QR Decomposition: A = Q * R
+    /// Q is mxn (orthogonal columns), R is nxn (upper triangular).
+    /// Uses Householder reflections for numerical stability.
+    pub fn qr(&self) -> Result<(Matrix, Matrix), StatsError> {
+        let m = self.rows;
+        let n = self.cols;
+        
+        // We will modify 'q' in-place to accumulate reflections, then extract R.
+        // For a full implementation, we'd store Householder vectors, 
+        // but for learning, explicit Q construction is clearer.
+        let mut q = Matrix::identity(m);
+        let mut r = self.clone();
+
+        for k in 0..n {
+            // 1. Get the column vector x below the diagonal in column k
+            // We need to zero out elements r[k+1..m, k]
+            
+            // Norm of the sub-column x
+            let mut norm_x_sq = 0.0;
+            for i in k..m {
+                norm_x_sq += r[(i, k)] * r[(i, k)];
+            }
+            let norm_x = norm_x_sq.sqrt();
+            
+            // If column is already 0, skip (singular-ish)
+            if norm_x < 1e-15 { continue; }
+
+            // 2. Construct Householder Vector 'u'
+            // u = x ± ||x|| * e_1
+            // Sign choice prevents catastrophic cancellation: u[0] += sign(x[0]) * norm
+            let alpha = if r[(k, k)] >= 0.0 { -norm_x } else { norm_x };
+            
+            // We only need the non-zero part of u (from row k to m)
+            // But to apply it, we usually think of it as size m.
+            // Let's optimize: Store u_vec physically as size (m-k)
+            let mut u_vec = Vec::with_capacity(m - k);
+            
+            // u[0] = x[0] - alpha
+            u_vec.push(r[(k, k)] - alpha);
+            
+            // Copy rest of x
+            for i in (k + 1)..m {
+                u_vec.push(r[(i, k)]);
+            }
+
+            // Normalize u: v = u / ||u||
+            let mut norm_u_sq = 0.0;
+            for val in &u_vec { norm_u_sq += val * val; }
+            let norm_u = norm_u_sq.sqrt();
+            
+            if norm_u < 1e-15 { continue; } // Should not happen if norm_x > 0
+
+            for val in &mut u_vec { *val /= norm_u; }
+
+            // 3. Apply Householder Reflection to R: R = (I - 2vv^T) R
+            // We only update the submatrix R[k..m, k..n]
+            // R = R - 2 * v * (v^T * R)
+            
+            for j in k..n {
+                // Dot product v . col_j
+                let mut dot = 0.0;
+                for i in 0..(m - k) {
+                    dot += u_vec[i] * r[(k + i, j)];
+                }
+
+                // Subtract
+                for i in 0..(m - k) {
+                    r.data[(k + i) * n + j] -= 2.0 * u_vec[i] * dot;
+                }
+            }
+
+            // 4. Apply Householder Reflection to Q: Q = Q * (I - 2vv^T)
+            // Note order! We accumulate Q by right-multiplying H_k
+            // Q_new = Q_old - 2 * (Q_old * v) * v^T
+            
+            for i in 0..m {
+                // Dot product row_i_of_Q . v
+                let mut dot = 0.0;
+                for l in 0..(m - k) {
+                    dot += q[(i, k + l)] * u_vec[l];
+                }
+
+                // Subtract
+                for l in 0..(m - k) {
+                    q.data[i * m + (k + l)] -= 2.0 * dot * u_vec[l];
+                }
+            }
+        }
+        
+        // Return Reduced Q (first n columns) and Reduced R (top n rows)
+        // We currently have Q as mxm and R as mxn (with zeros at bottom).
+        // Let's chop them.
+        
+        let q_reduced = if m > n {
+            let mut data = Vec::with_capacity(m * n);
+            for r in 0..m {
+                for c in 0..n {
+                    data.push(q[(r, c)]);
+                }
+            }
+            Matrix::new(data, m, n).unwrap()
+        } else {
+            q 
+        };
+
+        let r_reduced = if m > n {
+             let mut data = Vec::with_capacity(n * n);
+             for r in 0..n {
+                 for c in 0..n {
+                     data.push(r[(r, c)]);
+                 }
+             }
+             Matrix::new(data, n, n).unwrap()
+        } else {
+            r
+        };
+
+        Ok((q_reduced, r_reduced))
+    }
+
+    /// Solves Ax = b using QR Decomposition.
+    /// 1. A = Q * R
+    /// 2. R * x = Q^T * b
+    /// 3. Back-substitution for x
+    pub fn qr_solve(&self, rhs: &Matrix) -> Result<Matrix, StatsError> {
+        let (q, r) = self.qr()?;
+        
+        // 1. Calculate y = Q^T * b
+        // Q is mxn, b is mx1 (or mxp). Q^T is nxm.
+        // y will be nx1.
+        let qt = q.transpose();
+        let y = qt.multiply(rhs)?;
+
+        // 2. Solve R * x = y using Back Substitution
+        // R is nxn upper triangular.
+        let n = r.rows;
+        let mut x = Matrix::zeros(n, rhs.cols);
+
+        for k in 0..rhs.cols {
+            for i in (0..n).rev() {
+                let mut sum = y[(i, k)];
+                for j in (i + 1)..n {
+                    sum -= r[(i, j)] * x[(j, k)];
+                }
+                
+                if r[(i, i)].abs() < 1e-15 {
+                     return Err(StatsError::SingularMatrix);
+                }
+                x.data[i * rhs.cols + k] = sum / r[(i, i)];
+            }
+        }
+
+        Ok(x)
+    }
+
+
     /// Performs Cholesky decomposition: A = L * L^T.
     /// Returns L (Lower Triangular Matrix).
     /// Requires matrix to be Symmetric Positive Definite (SPD).
