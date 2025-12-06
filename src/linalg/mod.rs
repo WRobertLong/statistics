@@ -624,7 +624,7 @@ pub fn mean(data: &[f64]) -> Option<f64> {
 /// 
 /// Example:
 /// [ 1, 0, 2 ]
-/// [ 0, 0, 3 ]
+/// [ 0, 0, 3 ] 
 /// [ 4, 5, 6 ]
 ///
 /// values:      [ 1, 2, 3, 4, 5, 6 ] (Only non-zeros)
@@ -712,5 +712,59 @@ impl CSRMatrix {
         }
 
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*; // Import everything from the parent module (Matrix, CSRMatrix, etc.)
+
+    #[test]
+    fn test_csr_4x4_manual() {
+        // The "Morning Coffee" Matrix
+        // [ 0, 0, 0, 5 ]
+        // [ 9, 0, 0, 0 ]
+        // [ 0, 0, 0, 0 ]
+        // [ 0, 8, 2, 0 ]
+        
+        let data = vec![
+            0.0, 0.0, 0.0, 5.0,
+            9.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0,
+            0.0, 8.0, 2.0, 0.0
+        ];
+        
+        // We know Matrix::new works, so we unwrap it
+        let dense = Matrix::new(data, 4, 4).unwrap();
+        
+        // Convert to Sparse
+        let sparse = CSRMatrix::from_dense(&dense);
+
+        // Verify your manual calculations
+        // values: [ 5, 9, 8, 2 ]
+        assert_eq!(sparse.values, vec![5.0, 9.0, 8.0, 2.0]);
+        
+        // col_indices: [ 3, 0, 1, 2 ]
+        assert_eq!(sparse.col_indices, vec![3, 0, 1, 2]);
+        
+        // row_ptr: [ 0, 1, 2, 2, 4 ]
+        assert_eq!(sparse.row_ptr, vec![0, 1, 2, 2, 4]);
+    }
+
+    #[test]
+    fn test_sparse_multiplication() {
+        // A simple 3x3 identity-like check
+        let data = vec![
+            1.0, 0.0, 0.0,
+            0.0, 2.0, 0.0,
+            0.0, 0.0, 3.0
+        ];
+        let dense = Matrix::new(data, 3, 3).unwrap();
+        let sparse = CSRMatrix::from_dense(&dense);
+
+        let x = vec![1.0, 1.0, 1.0];
+        let result = sparse.multiply_vector(&x).expect("Multiplication failed");
+
+        assert_eq!(result, vec![1.0, 2.0, 3.0]);
     }
 }
