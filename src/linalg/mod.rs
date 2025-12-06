@@ -616,3 +616,101 @@ pub fn mean(data: &[f64]) -> Option<f64> {
     let sum: f64 = data.iter().sum();
     Some(sum / data.len() as f64)
 }
+
+// --- SPARSE MATRIX SUPPORT ---
+
+/// Compressed Sparse Row (CSR) Matrix.
+/// Efficient format for arithmetic operations (row-slicing is fast).
+/// 
+/// Example:
+/// [ 1, 0, 2 ]
+/// [ 0, 0, 3 ]
+/// [ 4, 5, 6 ]
+///
+/// values:      [ 1, 2, 3, 4, 5, 6 ] (Only non-zeros)
+/// col_indices: [ 0, 2, 2, 0, 1, 2 ] (Column for each value)
+/// row_ptr:     [ 0, 2, 3, 6 ]       (Index where each row starts. Last is total len)
+#[derive(Debug, Clone)]
+pub struct CSRMatrix {
+    pub rows: usize,
+    pub cols: usize,
+    pub values: Vec<f64>,
+    pub col_indices: Vec<usize>,
+    pub row_ptr: Vec<usize>,
+}
+
+impl CSRMatrix {
+    /// Creates a new empty CSR Matrix
+    pub fn new(rows: usize, cols: usize) -> Self {
+        // row_ptr always has length rows + 1. Starts with 0.
+        let row_ptr = vec![0; rows + 1];
+        CSRMatrix {
+            rows,
+            cols,
+            values: Vec::new(),
+            col_indices: Vec::new(),
+            row_ptr,
+        }
+    }
+
+    /// Converts a Dense Matrix to Sparse CSR format
+    /// (Useful for testing our sparse logic against dense logic)
+    pub fn from_dense(matrix: &Matrix) -> Self {
+        let mut values = Vec::new();
+        let mut col_indices = Vec::new();
+        let mut row_ptr = Vec::with_capacity(matrix.rows + 1);
+        
+        row_ptr.push(0); // Start of Row 0
+
+        for r in 0..matrix.rows {
+            for c in 0..matrix.cols {
+                let val = matrix[(r, c)];
+                if val.abs() > 1e-10 { // Treat small numbers as zero
+                    values.push(val);
+                    col_indices.push(c);
+                }
+            }
+            // The start of the NEXT row is the current total number of values
+            row_ptr.push(values.len());
+        }
+
+        CSRMatrix {
+            rows: matrix.rows,
+            cols: matrix.cols,
+            values,
+            col_indices,
+            row_ptr,
+        }
+    }
+
+    /// Sparse Matrix - Vector Multiplication
+    /// y = A * x
+    /// O(nnz) - Only iterates over non-zeros!
+    pub fn multiply_vector(&self, x: &[f64]) -> Result<Vec<f64>, StatsError> {
+        if x.len() != self.cols {
+            return Err(StatsError::DimensionMismatch {
+                expected: format!("Vector len {}", self.cols),
+                actual: format!("Vector len {}", x.len()),
+            });
+        }
+
+        let mut result = vec![0.0; self.rows];
+
+        // Iterate over rows
+        for r in 0..self.rows {
+            let row_start = self.row_ptr[r];
+            let row_end = self.row_ptr[r + 1];
+
+            let mut sum = 0.0;
+            // The Slice Trick: We only look at values for this row
+            for idx in row_start..row_end {
+                let val = self.values[idx];
+                let col = self.col_indices[idx];
+                sum += val * x[col];
+            }
+            result[r] = sum;
+        }
+
+        Ok(result)
+    }
+}
