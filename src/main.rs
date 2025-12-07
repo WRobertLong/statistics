@@ -1,103 +1,63 @@
 // src/main.rs
 
-use statistics::linalg;            // For Matrix
-use statistics::stats::univariate; // For mean, median, variance
-use statistics::stats::linear;     // For ols
+use std::io::{self, Write};
+use std::collections::HashMap;
+use statistics::linalg::{self, Matrix, CSRMatrix};
+use statistics::stats::univariate; 
+use statistics::stats::linear;     
 
 fn main() {
-    println!("--- RUST STATS LIBRARY TESTS ---");
+    println!("========================================");
+    println!("   RUST STATS LIBRARY + REPL DEMO       ");
+    println!("========================================");
 
     // =========================================================================
-    // 1. Univariate Test (Mean)
+    // 1. Univariate Test (Mean, Median, Variance) - [PRESERVED]
     // =========================================================================
+    println!("\n[1] UNIVARIATE STATISTICS");
+    println!("-------------------------");
 
-    // 1. Test with floats (Easy)
     let my_data = vec![1.0, 2.0, 3.0, 4.0, 100.0];
     
-    // match handles the Option result (Some or None)
     match univariate::mean(&my_data) {
-        Some(m) => println!("Mean: {:.2}", m),
+        Some(m) => println!("Mean:            {:.2}", m),
         None => println!("Vector was empty!"),
     }
 
     match univariate::median(&my_data) {
-        Some(m) => println!("Median: {:.2}", m),
+        Some(m) => println!("Median:          {:.2}", m),
         None => println!("Vector was empty!"),
     }
 
     match univariate::sample_variance(&my_data) {
-        Some(m) => println!("Sample Variance|: {:.2}", m),
+        Some(m) => println!("Sample Variance: {:.2}", m),
         None => println!("Vector was empty!"),
     }
 
     // =========================================================================
-    // 2. Matrix Tests (Creation, Indexing, Transpose)
+    // 2. Matrix Tests (Inverse & Singular) - [PRESERVED]
     // =========================================================================
-    
-    // Define a 3x2 Matrix (Data stored row-major: [1, 2], [3, 4], [5, 6])
-    let matrix_data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
-    
-    // Create the Matrix
-    let a = match linalg::Matrix::new(matrix_data, 3, 2) {
-        Some(m) => m,
-        None => {
-            println!("\n❌ ERROR: Failed to create matrix. Data length mismatch.");
-            return;
-        }
-    };
+    println!("\n[2] MATRIX INVERSION");
+    println!("--------------------");
 
-    println!("\n--- Original Matrix A (3x2) ---");
-    println!("{}", a); // Uses fmt::Display
-    
-    // Test Indexing (Uses std::ops::Index implementation)
-    // Element at row 2, col 1 should be 6.0
-    let val_2_1 = a[(2, 1)]; 
-    println!("Element at A[2, 1] is: {:.1}", val_2_1);
-    
-    // Test Transpose
-    let a_t = a.transpose();
-    
-    println!("\n--- Transposed Matrix A^T (2x3) ---");
-    println!("{}", a_t);
-    
-    // Test Indexing on Transpose (Element at A^T[1, 2] should also be 6.0)
-    let val_t_1_2 = a_t[(1, 2)];
-    println!("Element at A^T[1, 2] is: {:.1}", val_t_1_2); 
-
-    println!("--- MATRIX INVERSION TEST ---");
-
-    // 1. Define a 2x2 Matrix (that we know is invertible)
-    // Matrix A = [[4, 7], [2, 6]]
-    // Determinant = (4*6) - (7*2) = 24 - 14 = 10.
-    // Since Det != 0, it is invertible.
+    // 1. Invertible Matrix
     let data = vec![4.0, 7.0, 2.0, 6.0];
     let a = linalg::Matrix::new(data, 2, 2).unwrap();
 
     println!("Original Matrix A:\n{}", a);
 
-    // 2. Calculate Inverse
     match a.inverse() {
         Ok(a_inv) => {
             println!("Inverse Matrix A^-1:\n{}", a_inv);
-            
-            // MANUAL CHECK:
-            // Inverse should be: [[0.6, -0.7], [-0.2, 0.4]]
-            
-            // 3. Verify: A * A^-1 should equal Identity
             println!("Verification (A * A^-1):");
             let identity_check = a.multiply(&a_inv).unwrap();
             println!("{}", identity_check);
-            
-            // The result should look like:
-            // 1.0000  0.0000
-            // 0.0000  1.0000
         },
         Err(e) => println!("Inversion failed: {}", e),
     }
 
-    println!("\n--- SINGULAR MATRIX TEST (Should Fail) ---");
-    // Matrix B = [[1, 2], [2, 4]]
-    // Det = 4 - 4 = 0. This is singular.
+    // 2. Singular Matrix
+    println!("Testing Singular Matrix (Should Fail):");
     let singular_data = vec![1.0, 2.0, 2.0, 4.0];
     let b = linalg::Matrix::new(singular_data, 2, 2).unwrap();
     
@@ -106,47 +66,145 @@ fn main() {
         Err(e) => println!("Success! Caught expected error: {}", e),
     }
 
-    println!("--- OLS LINEAR REGRESSION TEST ---");
+    // =========================================================================
+    // 3. OLS Linear Regression Test - [PRESERVED]
+    // =========================================================================
+    println!("\n[3] OLS LINEAR REGRESSION");
+    println!("-------------------------");
     println!("Target Model: y = 2x + 1");
 
-    // 1. Create Design Matrix X (4 rows, 2 columns)
-    // Col 0: Intercept (1.0)
-    // Col 1: Variable x (1, 2, 3, 4)
+    // Design Matrix X (Intercept + Slope)
     let x_data = vec![
-        1.0, 1.0,  // Row 1
-        1.0, 2.0,  // Row 2
-        1.0, 3.0,  // Row 3
-        1.0, 4.0   // Row 4
+        1.0, 1.0,  
+        1.0, 2.0,  
+        1.0, 3.0,  
+        1.0, 4.0   
     ];
     let x = linalg::Matrix::new(x_data, 4, 2).unwrap();
 
-    // 2. Create Target Vector y (4 rows, 1 column)
-    // y = 2(1)+1 = 3
-    // y = 2(2)+1 = 5
-    // ...
+    // Target Vector y
     let y_data = vec![3.0, 5.0, 7.0, 9.0];
     let y = linalg::Matrix::new(y_data, 4, 1).unwrap();
 
-    println!("Design Matrix X:\n{}", x);
-    println!("Target Vector y:\n{}", y);
-
-    // 3. Run Regression
     match linear::fit_ols(&x, &y) {
         Ok(beta) => {
-            println!("--------------------------------");
             println!("Estimated Coefficients (Beta):");
             println!("{}", beta);
-            
-            println!("Interpretation:");
-            println!("Intercept (Beta_0): {:.4}", beta[(0, 0)]);
-            println!("Slope (Beta_1):     {:.4}", beta[(1, 0)]);
+            println!("Intercept: {:.4}", beta[(0, 0)]);
+            println!("Slope:     {:.4}", beta[(1, 0)]);
         },
         Err(e) => println!("Regression Failed: {}", e),
     }
 
-    println!("\nAll tests completed successfully! 🎉");
+    // =========================================================================
+    // 4. Sparse Matrix Demo - [NEW]
+    // =========================================================================
+    println!("\n[4] SPARSE MATRIX (CSR) DEMO");
+    println!("----------------------------");
+    
+    // 1  0  0  5
+    // 0  2  0  0
+    // 0  0  3  0
+    let sparse_data = vec![
+        1.0, 0.0, 0.0, 5.0,
+        0.0, 2.0, 0.0, 0.0,
+        0.0, 0.0, 3.0, 0.0
+    ];
+    
+    let dense_for_sparse = Matrix::new(sparse_data, 3, 4).unwrap();
+    let sparse = CSRMatrix::from_dense(&dense_for_sparse);
+    
+    println!("Dense form:\n{}", dense_for_sparse);
+    println!("CSR Values:      {:?}", sparse.values);      
+    println!("CSR Col Indices: {:?}", sparse.col_indices); 
+    println!("CSR Row Ptrs:    {:?}", sparse.row_ptr);     
 
+    let v = vec![1.0, 1.0, 1.0, 1.0];
+    match sparse.multiply_vector(&v) {
+        Ok(res) => println!("\nResult of Sparse * [1,1,1,1]:\n{:?}", res),
+        Err(e) => println!("Error: {}", e),
+    }
 
+    // =========================================================================
+    // 5. Interactive REPL - [NEW]
+    // =========================================================================
+    println!("\n[5] INTERACTIVE REPL");
+    println!("--------------------");
+    println!("Commands:");
+    println!("  Assign:  $ A = [1, 2, 3, 4, rows=2]");
+    println!("  Print:   $ A");
+    println!("  Exit:    exit");
+    println!("--------------------\n");
 
+    let mut variables: HashMap<String, Matrix> = HashMap::new();
 
+    loop {
+        print!("$ ");
+        io::stdout().flush().unwrap();
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        let input = input.trim();
+
+        if input.eq_ignore_ascii_case("exit") {
+            break;
+        }
+        if input.is_empty() { continue; }
+
+        if input.contains('=') {
+            // --- ASSIGNMENT MODE ---
+            let parts: Vec<&str> = input.splitn(2, '=').collect();
+            let var_name = parts[0].trim().to_string();
+            let content = parts[1].trim();
+
+            if content.starts_with('[') && content.ends_with(']') {
+                let inner = &content[1..content.len()-1];
+                let params: Vec<&str> = inner.split(',').collect();
+
+                let mut data = Vec::new();
+                let mut rows = 0;
+
+                for p in params {
+                    let p = p.trim();
+                    if p.to_lowercase().starts_with("rows") {
+                        let kv: Vec<&str> = p.split('=').collect();
+                        if kv.len() == 2 {
+                            if let Ok(r) = kv[1].trim().parse::<usize>() {
+                                rows = r;
+                            }
+                        }
+                    } else if p.to_lowercase().contains("byrow") {
+                         println!("(Note: 'byrow' is ignored, assuming row-major)");
+                    } else {
+                        if let Ok(val) = p.parse::<f64>() {
+                            data.push(val);
+                        }
+                    }
+                }
+
+                if rows > 0 && !data.is_empty() {
+                    let cols = data.len() / rows;
+                    match Matrix::new(data, rows, cols) {
+                        Some(m) => {
+                            println!("Created Matrix '{}' ({}x{})", var_name, rows, cols);
+                            println!("{}", m);
+                            variables.insert(var_name, m);
+                        },
+                        None => println!("Error: Data length does not match dimensions."),
+                    }
+                } else {
+                    println!("Error: Please specify 'rows=X' and ensure data is valid.");
+                }
+            } else {
+                println!("Error: Matrix definition must be in format [1, 2, ...]");
+            }
+        } else {
+            // --- INSPECTION MODE ---
+            if let Some(m) = variables.get(input) {
+                println!("{}", m);
+            } else {
+                println!("Unknown variable or command: '{}'", input);
+            }
+        }
+    }
 }
