@@ -338,8 +338,6 @@ impl Matrix {
         Ok(aug_b)
     }
 
-    // ... inside impl Matrix ...
-
     // --- QR DECOMPOSITION (The Numerical Gold Standard) ---
 
     /// Computes the Reduced QR Decomposition: A = Q * R
@@ -348,114 +346,104 @@ impl Matrix {
     pub fn qr(&self) -> Result<(Matrix, Matrix), StatsError> {
         let m = self.rows;
         let n = self.cols;
-        
+
         // We will modify 'q' in-place to accumulate reflections, then extract R.
-        // For a full implementation, we'd store Householder vectors, 
-        // but for learning, explicit Q construction is clearer.
         let mut q = Matrix::identity(m);
         let mut r = self.clone();
 
         for k in 0..n {
             // 1. Get the column vector x below the diagonal in column k
-            // We need to zero out elements r[k+1..m, k]
-            
-            // Norm of the sub-column x
             let mut norm_x_sq = 0.0;
             for i in k..m {
                 norm_x_sq += r[(i, k)] * r[(i, k)];
             }
             let norm_x = norm_x_sq.sqrt();
-            
-            // If column is already 0, skip (singular-ish)
+
+            // If column is already 0, skip
             if norm_x < 1e-15 { continue; }
 
             // 2. Construct Householder Vector 'u'
-            // u = x ± ||x|| * e_1
-            // Sign choice prevents catastrophic cancellation: u[0] += sign(x[0]) * norm
+            // Sign choice prevents catastrophic cancellation
             let alpha = if r[(k, k)] >= 0.0 { -norm_x } else { norm_x };
-            
-            // We only need the non-zero part of u (from row k to m)
-            // But to apply it, we usually think of it as size m.
-            // Let's optimize: Store u_vec physically as size (m-k)
+
+            // Optimize: Store u_vec physically as size (m-k)
             let mut u_vec = Vec::with_capacity(m - k);
-            
-            // u[0] = x[0] - alpha
             u_vec.push(r[(k, k)] - alpha);
-            
-            // Copy rest of x
+
             for i in (k + 1)..m {
                 u_vec.push(r[(i, k)]);
             }
 
-            // Normalize u: v = u / ||u||
+            // Normalize u
             let mut norm_u_sq = 0.0;
             for val in &u_vec { norm_u_sq += val * val; }
             let norm_u = norm_u_sq.sqrt();
-            
-            if norm_u < 1e-15 { continue; } // Should not happen if norm_x > 0
+
+            if norm_u < 1e-15 { continue; }
 
             for val in &mut u_vec { *val /= norm_u; }
 
-            // 3. Apply Householder Reflection to R: R = (I - 2vv^T) R
-            // We only update the submatrix R[k..m, k..n]
-            // R = R - 2 * v * (v^T * R)
-            
+            // 3. Apply Householder Reflection to R
             for j in k..n {
-                // Dot product v . col_j
                 let mut dot = 0.0;
                 for i in 0..(m - k) {
                     dot += u_vec[i] * r[(k + i, j)];
                 }
-
-                // Subtract
+                
+                // Apply subtraction
                 for i in 0..(m - k) {
                     r.data[(k + i) * n + j] -= 2.0 * u_vec[i] * dot;
                 }
             }
 
-            // 4. Apply Householder Reflection to Q: Q = Q * (I - 2vv^T)
-            // Note order! We accumulate Q by right-multiplying H_k
-            // Q_new = Q_old - 2 * (Q_old * v) * v^T
-            
+            // 4. Apply Householder Reflection to Q
             for i in 0..m {
-                // Dot product row_i_of_Q . v
                 let mut dot = 0.0;
                 for l in 0..(m - k) {
                     dot += q[(i, k + l)] * u_vec[l];
                 }
 
-                // Subtract
                 for l in 0..(m - k) {
                     q.data[i * m + (k + l)] -= 2.0 * dot * u_vec[l];
                 }
             }
         }
-        
-        // Return Reduced Q (first n columns) and Reduced R (top n rows)
-        // We currently have Q as mxm and R as mxn (with zeros at bottom).
-        // Let's chop them.
-        
+
+        // --- REDUCTION STEP (Thin QR) ---
+
+        // 1. Reduce Q (Take first n columns)
         let q_reduced = if m > n {
             let mut data = Vec::with_capacity(m * n);
-            for r in 0..m {
-                for c in 0..n {
-                    data.push(q[(r, c)]);
+            // FIXED: Use 'row' and 'col' to avoid shadowing 'q' or 'r'
+            for row in 0..m {
+                for col in 0..n {
+                    data.push(q[(row, col)]);
                 }
             }
-            Matrix::new(data, m, n).unwrap()
+            // FIXED: Use .ok_or() because Matrix::new returns Option
+            Matrix::new(data, m, n).ok_or(StatsError::DimensionMismatch {
+                expected: format!("{}x{}", m, n),
+                actual: "invalid data len".into()
+            })? 
         } else {
-            q 
+            q
         };
 
+        // 2. Reduce R (Take top n rows)
         let r_reduced = if m > n {
-             let mut data = Vec::with_capacity(n * n);
-             for r in 0..n {
-                 for c in 0..n {
-                     data.push(r[(r, c)]);
-                 }
-             }
-             Matrix::new(data, n, n).unwrap()
+            let mut data = Vec::with_capacity(n * n);
+            // FIXED: Use 'row' and 'col' to avoid shadowing
+            for row in 0..n {
+                for col in 0..n {
+                    data.push(r[(row, col)]);
+                }
+            }
+            Matrix::new(data, n, n).ok_or(StatsError::DimensionMismatch {
+                expected: format!("{}x{}", n, n),
+                actual: "invalid data len".into()
+            })?
         } else {
+            // 'r' is owned here, so we can return it directly without cloning
             r
         };
 
@@ -520,6 +508,7 @@ impl Matrix {
                 if i == j {
                     // Diagonal element
                     if sum <= 0.0 {
+                        // FIXED: Use the new Generic variant
                         return Err(StatsError::Generic("Matrix is not Positive Definite".into()));
                     }
                     l.data[i * n + j] = sum.sqrt();

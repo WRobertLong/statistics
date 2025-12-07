@@ -1,7 +1,7 @@
 // src/error.rs
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)] // Ensure Clone is here
 pub enum StatsError {
     #[error("Dimension mismatch: Operation requires matrices of shape {expected} but got {actual}")]
     DimensionMismatch { expected: String, actual: String },
@@ -14,4 +14,7 @@ pub enum StatsError {
     
     #[error("Data length does not match matrix dimensions.")]
     DataLengthMismatch,
+
+    #[error("Generic error: {0}")]
+    Generic(String),
 }
